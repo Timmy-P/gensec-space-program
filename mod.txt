@@ -1,0 +1,40 @@
+{
+    "name" : "Every Gun Launches Cops",
+    "description" : "Every gun has the shotgun catapult effect",
+    "author" : "Timmy-P",
+    "contact" : "Discord: @timmyp7",
+    "version" : "1.0",
+	"blt_version" : 2,
+    "hooks" : [
+		{
+			"hook_id" : "lib/units/weapons/RaycastWeaponBase",
+			"script_path" : "main.lua"
+		},
+		{
+			"hook_id" : "lib/managers/GamePlayCentralManager",
+			"script_path" : "main.lua"
+		},
+		{ 
+			"hook_id" : "lib/units/enemies/cop/copdamage",
+			"script_path" : "main.lua" 
+		},
+		{
+			"hook_id" : "lib/managers/playermanager",
+			"script_path" : "main.lua"
+		},
+		{
+			"hook_id" : "lib/managers/localizationmanager",
+			"script_path" : "main.lua"
+		}
+		
+    ]
+	"updates" : [
+		{
+			"identifier" : "timmy_crit_counter",
+			"host": {
+				"meta": "https://github.com/Timmy-P/gensec-space-program/raw/main/meta.json",
+				"download": "https://github.com/Timmy-P/gensec-space-program/archive/refs/heads/main.zip"
+			}
+		}
+	]
+}
