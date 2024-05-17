@@ -30,7 +30,7 @@
     ]
 	"updates" : [
 		{
-			"identifier" : "timmy_crit_counter",
+			"identifier" : "timmy_all_shotty",
 			"host": {
 				"meta": "https://github.com/Timmy-P/gensec-space-program/raw/main/meta.json",
 				"download": "https://github.com/Timmy-P/gensec-space-program/archive/refs/heads/main.zip"
