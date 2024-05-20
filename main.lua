@@ -1,16 +1,14 @@
 --TO DO LIST
--- Get override to play nicely - No errors! | DONE
--- Look into extracting crits | DONE
 -- Look into body expertise and/or headshot damage | No BE, but clamp to Judge is fine
 -- Look into explosive damage being amplified
--- Make shotgun push range an option | DONE
+local ccolor = Color(255, 0, 170, 255) / 255 --defining a color for debug chat messages
 local tmp_vec1 = Vector3()
 local tmp_vec2 = Vector3()
 local tmp_vec3 = Vector3()
-local tmp_vec4 = Vector3() --the one vector from GamePlayCentralManager that I can't declare on runtime easily.
---local c_dmg
-local ccolor = Color(255, 0, 170, 255) / 255
---local g_dmg = 1
+local tmp_vec4 = Vector3() --the one vector from GamePlayCentralManager that I can't declare on runtime easily. Rest I'm doing for... reasons
+local c_dmg = 1 --predeclaring to hopefully avoid nil crashes
+g_dmg = 15.5 --same as above
+c_dmg = 1 --also same as above
 --local ref_dmg = 15.5 --Base damage of the Judge shotgun, which is our par damage
 --Yes, everything's divided by 10 I don't know either
 --local push = Vector3()
@@ -92,6 +90,7 @@ if RequiredScript == "lib/managers/gameplaycentralmanager" then
 		--Might make an option to disable this, or if you're reading this and want to buff
 		--dozer pushes for some reason, the entire if statement is safe to delete or comment out.
 		--Might make this a toggle later.
+		--Update: I made this a toggle later.
 		if gensec_space_program.settings.buff_dozer_launches == false and not managers.groupai:state():whisper_mode() then
 			if asm and asm:get_global("tank") == 1 then
 				scale = scale * 0.3
