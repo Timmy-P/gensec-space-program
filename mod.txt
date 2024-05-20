@@ -1,5 +1,5 @@
 {
-    "name" : "Every Gun Launches Cops",
+    "name" : "Gensec Space Program",
     "description" : "Every gun has the shotgun catapult effect",
     "author" : "Timmy-P",
     "contact" : "Discord: @timmyp7",
