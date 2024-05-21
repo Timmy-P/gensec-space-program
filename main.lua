@@ -6,9 +6,10 @@ local tmp_vec1 = Vector3()
 local tmp_vec2 = Vector3()
 local tmp_vec3 = Vector3()
 local tmp_vec4 = Vector3() --the one vector from GamePlayCentralManager that I can't declare on runtime easily. Rest I'm doing for... reasons
-local c_dmg = 1 --predeclaring to hopefully avoid nil crashes
+--local c_dmg = 1 --predeclaring to hopefully avoid nil crashes
 g_dmg = 15.5 --same as above
 c_dmg = 1 --also same as above
+other_kill = false
 --local ref_dmg = 15.5 --Base damage of the Judge shotgun, which is our par damage
 --Yes, everything's divided by 10 I don't know either
 --local push = Vector3()
@@ -39,8 +40,35 @@ Hooks:PostHook(CopDamage, 'roll_critical_hit', 'get_crit', function(self, attack
 	--managers.chat:_receive_message(managers.chat.GAME, "roll_critical_hit", "Crit for " .. c_dmg, ccolor)
 end)
 
+Hooks:PostHook(CopDamage, 'sync_damage_bullet', 'get_ded', function(self, attacker_unit, damage_percent, i_body, hit_offset_height, variant, death)
+	local hit_pos = mvector3.copy(self._unit:movement():m_pos())
+	mvector3.set_z(hit_pos, hit_pos.z + hit_offset_height)
+	local attack_dir, distance = nil
+
+	if attacker_unit then
+		attack_dir = hit_pos - attacker_unit:movement():m_head_pos()
+		distance = mvector3.normalize(attack_dir)
+	else
+		attack_dir = self._unit:rotation():y()
+	end
+	
+	if death and gensec_space_program.settings.other_players_launch == true then
+		other_kill = true
+		g_dmg = damage_percent * self._HEALTH_INIT_PRECENT
+		--g_dmg = g_dmg * 5
+		ref_dmg = (gensec_space_program.settings.reference_damage / 10) * (damage_percent * self._HEALTH_INIT_PRECENT)
+		--managers.game_play_central:_do_shotgun_push(self._unit, hit_pos, attack_dir, distance)
+		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "ded for " .. g_dmg .. " ref ".. ref_dmg .. " d_% " .. damage_percent .. " ship " .. self._HEALTH_INIT_PRECENT, ccolor)
+		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "ref is " .. ref_dmg, ccolor)
+		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "d_% is " .. damage_percent .. "", ccolor)
+		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "ship = " .. self._HEALTH_INIT_PRECENT, ccolor)
+	end
+
+end)
+
 Hooks:PreHook(RaycastWeaponBase, '_get_current_damage', 'get_real_damage' , function(self, dmg_mul)
 	g_dmg = self._damage * dmg_mul
+	other_kill = false
 	--dmg_mul accounts for Trigger Happy, Overkill, and Berserker.
 	--managers.chat:_receive_message(managers.chat.GAME, "Debug", "Firing for " .. g_dmg .." dmg_mul is ".. dmg_mul, ccolor)
 end)
@@ -65,23 +93,22 @@ if RequiredScript == "lib/managers/gameplaycentralmanager" then
 	
 	
 		local scale = math.clamp(1 - distance / math.min(self:get_shotgun_push_range(attacker), 500), 0.5, 1)
-		
+		--managers.chat:_receive_message(managers.chat.GAME, "_do_shotgun_push", "scale pre =  " .. scale , ccolor)
 		--Magic happens here. If your gun's damage is higher than the Judge, calculate the ratio and multiply the vector's scalar by it.
 		--If not, then it's a Judge (or whatever damage the user specified).
 		if not managers.groupai:state():whisper_mode() then
-			ref_dmg = gensec_space_program.settings.reference_damage / 10
+			if other_kill == false then
+				ref_dmg = gensec_space_program.settings.reference_damage / 10
+			end
 			--Multiplies by crits. Will be 1 if it didn't crit.
 			scale = scale * c_dmg
-			--if c_dmg > 1 then
-			--	scale = scale * (1 + (c_dmg * gensec_space_program.settings.crit_launch_multiplier))
-			--end
 			scale = scale * math.max(1, (g_dmg / ref_dmg))
 			scale = scale * gensec_space_program.settings.launch_multiplier
 			--managers.chat:_receive_message(managers.chat.GAME, "_do_shotgun_push", "crit mul  " .. (1 + (gensec_space_program.settings.crit_launch_multiplier / 10)) , ccolor)
 		end
+		--managers.chat:_receive_message(managers.chat.GAME, "_do_shotgun_push", "g_dmg =  " .. g_dmg , ccolor)
 		--managers.chat:_receive_message(managers.chat.GAME, "_do_shotgun_push", "scale pre =  " .. scale , ccolor)
-		
-		
+		--there was something I was testing here
 		--managers.chat:_receive_message(managers.chat.GAME, "_do_shotgun_push", "scale post =  " .. scale , ccolor)
 		local rot_time = 1 + math.rand(2)
 		local asm = unit:anim_state_machine()
@@ -142,7 +169,6 @@ if RequiredScript == "lib/managers/gameplaycentralmanager" then
 end
 
 
-
 --OPTIONS STUFF HERE (thanks hoppip)--
 Hooks:Add("LocalizationManagerPostInit", "GSP_menu_loc", function(localization_manager)
 
@@ -152,7 +178,9 @@ Hooks:Add("LocalizationManagerPostInit", "GSP_menu_loc", function(localization_m
 	  ["menu_gensec_space_program_launch_multiplier_desc"] = "A multiplier of the launch overall.",
 	  ["menu_gensec_space_program_infinite_launch_range_desc"] = "Whether or not you want to launch cops with kills further than 5 meters away from you.",
 	  ["menu_gensec_space_program_crit_launch_toggle"] = "Crits amplify launch strength",
-	  ["menu_gensec_space_program_crit_launch_toggle_desc"] = "Determines whether or not critical hits will amplify the strength of the launch, according to the enemy's respective damage multiplier."
+	  ["menu_gensec_space_program_crit_launch_toggle_desc"] = "Determines whether or not critical hits will amplify the strength of the launch, according to the enemy's respective damage multiplier.",
+	  ["menu_gensec_space_program_other_players_launch"] = "Other players can launch corpses",
+	  ["menu_gensec_space_program_other_players_launch_desc"] = "Determine whether or not other players in the session will launch bodies according to the other options specified here. Jokers, turrets, and AI Crew mates are not considered."
 	  --["menu_gensec_space_program_crit_launch_multiplier_desc"] = "Choose if you want critical hits to amplify the launch further, and if so, by how much."
 	})
   end)
@@ -161,14 +189,8 @@ dofile(ModPath .. "automenubuilder.lua") -- run the auto menu builder file to ha
 
 Hooks:Add("MenuManagerBuildCustomMenus", "MenuManagerBuildCustomMenusgensec_space_program", function(menu_manager, nodes)
 
-	-- loads previously saved settings for that mod into the given table
 	AutoMenuBuilder:load_settings(gensec_space_program.settings, "gensec_space_program")
 	ref_dmg_IDENTIFIER_OPTION_desc = "test"
-	-- automatically creates a mod options menu from a table containing key/value pairs
-	-- the type of menu element created from a value in the table is determined by the value type
-	-- localization ids are generated in the style: menu_IDENTIFIER_OPTION and menu_IDENTIFIER_OPTION_desc
-	-- example for this mod: menu_gensec_space_program_slider, menu_gensec_space_program_slider_desc, menu_gensec_space_program_inherited_1, ...
-	-- if no localization is available for an option name it is auto generated from the option name
 	AutoMenuBuilder:create_menu_from_table(nodes, gensec_space_program.settings, "gensec_space_program", "blt_options", gensec_space_program.values --[[ optional ]], gensec_space_program.order --[[ optional ]])
   
   end)
@@ -179,7 +201,8 @@ gensec_space_program = gensec_space_program or {
     reference_damage = 162.80, 
     launch_multiplier = 1, 
 	infinite_launch_range = false,
-	crit_launch_toggle = true 
+	crit_launch_toggle = true, 
+	other_players_launch = true
 	--crit_launch_multiplier = 1
   },
   values = {
