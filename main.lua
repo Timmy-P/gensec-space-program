@@ -1,19 +1,28 @@
 --TO DO LIST
 -- Look into body expertise and/or headshot damage | No BE, but clamp to Judge is fine
 -- Look into explosive damage being amplified
-local ccolor = Color(255, 0, 170, 255) / 255 --defining a color for debug chat messages
-local tmp_vec1 = Vector3()
-local tmp_vec2 = Vector3()
-local tmp_vec3 = Vector3()
-local tmp_vec4 = Vector3() --the one vector from GamePlayCentralManager that I can't declare on runtime easily. Rest I'm doing for... reasons
---local c_dmg = 1 --predeclaring to hopefully avoid nil crashes
-g_dmg = 15.5 --same as above
-c_dmg = 1 --also same as above
+
+ccolor = Color(255, 0, 170, 255) / 255 --defining a color for debug chat messages
+tmp_vec1 = Vector3()
+tmp_vec2 = Vector3()
+tmp_vec3 = Vector3()
+tmp_vec4 = Vector3() --the one vector from GamePlayCentralManager that I can't declare on runtime easily. Rest I'm doing for... reasons
+
+cl_unit = nil
+cl_hp = nil
+cl_dir = nil
+cl_distance = nil
+cl_attacker = nil
+--is_graze_kill = false
+
+--cl_ is usually "client," first prefix I could think of for saving/storing the values of the parameters pass into _do_shotgun_push
+--Reason being is for Graze kills, found it easier to recycle some of values, as Graze is considered after the shotgun push of the original kill
+
+g_dmg = 16.28 --predeclaring to hopefully avoid nil crashes
+c_dmg = 1 --same as above
 other_kill = false
 --local ref_dmg = 15.5 --Base damage of the Judge shotgun, which is our par damage
 --Yes, everything's divided by 10 I don't know either
---local push = Vector3()
-
 
 Hooks:PostHook(RaycastWeaponBase, 'should_shotgun_push', 'everyonepushes' , function(self)
 		--Check if you're in stealth, if not then do the thing
@@ -43,21 +52,24 @@ end)
 Hooks:PostHook(CopDamage, 'sync_damage_bullet', 'get_ded', function(self, attacker_unit, damage_percent, i_body, hit_offset_height, variant, death)
 	local hit_pos = mvector3.copy(self._unit:movement():m_pos())
 	mvector3.set_z(hit_pos, hit_pos.z + hit_offset_height)
-	local attack_dir, distance = nil
+	local attack_dir, s_distance = nil
 
 	if attacker_unit then
 		attack_dir = hit_pos - attacker_unit:movement():m_head_pos()
-		distance = mvector3.normalize(attack_dir)
+		s_distance = mvector3.normalize(attack_dir)
 	else
 		attack_dir = self._unit:rotation():y()
 	end
 	
 	if death and gensec_space_program.settings.other_players_launch == true then
 		other_kill = true
+		--is_graze_kill = false
 		g_dmg = damage_percent * self._HEALTH_INIT_PRECENT
 		--g_dmg = g_dmg * 5
+		c_dmg = 1
+		dmg_mul = 1
 		ref_dmg = (gensec_space_program.settings.reference_damage / 10) * (damage_percent * self._HEALTH_INIT_PRECENT)
-		--managers.game_play_central:_do_shotgun_push(self._unit, hit_pos, attack_dir, distance)
+		managers.game_play_central:_do_shotgun_push(self._unit, hit_pos, attack_dir, s_distance)
 		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "ded for " .. g_dmg .. " ref ".. ref_dmg .. " d_% " .. damage_percent .. " ship " .. self._HEALTH_INIT_PRECENT, ccolor)
 		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "ref is " .. ref_dmg, ccolor)
 		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "d_% is " .. damage_percent .. "", ccolor)
@@ -66,10 +78,49 @@ Hooks:PostHook(CopDamage, 'sync_damage_bullet', 'get_ded', function(self, attack
 
 end)
 
+
+Hooks:PostHook(CopDamage, 'damage_simple', 'get_graze', function(self, attack_data)
+	if attack_data.variant == "graze" and attack_data.result.type == "death" then
+		--managers.chat:_receive_message(managers.chat.GAME, "damage_simple", "graze for " .. g_dmg, ccolor)
+		--g_dmg = attack_data.damage
+		--attack_data.attack_dir will grab from original point of impact, cl_dir should in theory get the vector between player and original enemy
+		--cl_dir will now
+		c_dmg = 1
+		dmg_mul = 1
+		other_kill = false
+		--is_graze_kill = true
+		--managers.chat:_receive_message(managers.chat.GAME, "damage_simple", "graze!", ccolor)
+		local hit_pos = mvector3.copy(self._unit:movement():m_pos())
+		--local g_distance = mvector3.normalize(attack_data.attack_dir)
+		if cl_dir ~= nil then 
+			local g_distance = mvector3.normalize(cl_dir)
+			managers.game_play_central:_do_shotgun_push(self._unit, hit_pos, cl_dir, g_distance, cl_attacker)
+		else
+			local g_distance = mvector3.normalize(attack_data.attack_dir)
+			managers.game_play_central:_do_shotgun_push(self._unit, hit_pos, attack_data.attack_dir, g_distance, cl_attacker)
+		end
+		--managers.game_play_central:_do_shotgun_push(self._unit, hit_pos, cl_dir, g_distance, cl_attacker)
+		--if is_graze_kill == true then
+			--managers.game_play_central:_do_shotgun_push(self._unit, hit_pos, cl_dir, g_distance, cl_attacker)
+		--else
+			--managers.game_play_central:_do_shotgun_push(self._unit, hit_pos, attack_data.attack_dir, g_distance, cl_attacker)
+			--cl_dir = attack_data.attack_dir
+			--is_graze_kill = true
+		--end
+	end
+end)
+
+Hooks:PostHook(CopDamage, 'damage_bullet', 'get_not_graze', function(attack_data)
+	--managers.chat:_receive_message(managers.chat.GAME, "damage_bullet", "boolet", ccolor)
+	--is_graze_kill = false
+	other_kill = false
+	cl_dir = attack_data.attack_dir
+end)
+
 Hooks:PreHook(RaycastWeaponBase, '_get_current_damage', 'get_real_damage' , function(self, dmg_mul)
 	g_dmg = self._damage * dmg_mul
 	other_kill = false
-	--dmg_mul accounts for Trigger Happy, Overkill, and Berserker.
+	--dmg_mul accounts for Overkill, Berserker, and Trigger Happy.
 	--managers.chat:_receive_message(managers.chat.GAME, "Debug", "Firing for " .. g_dmg .." dmg_mul is ".. dmg_mul, ccolor)
 end)
 
@@ -84,6 +135,12 @@ end)
 
 if RequiredScript == "lib/managers/gameplaycentralmanager" then
 	function GamePlayCentralManager:_do_shotgun_push(unit, hit_pos, dir, distance, attacker)
+		cl_unit = unit
+		cl_hp = hit_pos
+		cl_dir = dir
+		cl_distance = distance
+		cl_attacker = attacker
+		--managers.chat:_receive_message(managers.chat.GAME, "_do_shotgun_push", "pushit!", ccolor)
 		local mov_ext = unit:movement()
 		local full_body_action = mov_ext and mov_ext:get_action(1)
 	
@@ -125,9 +182,7 @@ if RequiredScript == "lib/managers/gameplaycentralmanager" then
 			end
 		end
 		local push_vec = tmp_vec1
-		
 		mvector3.set_static(push_vec, dir.x, dir.y, dir.z + 0.5)
-		
 		--I've found just incrasing this value of 600 to something higher gets results
 		--What I did was band-aid solutions to make things scale with gun damage, however
 		--You can also just buff everything with this if you want.
@@ -180,7 +235,7 @@ Hooks:Add("LocalizationManagerPostInit", "GSP_menu_loc", function(localization_m
 	  ["menu_gensec_space_program_crit_launch_toggle"] = "Crits amplify launch strength",
 	  ["menu_gensec_space_program_crit_launch_toggle_desc"] = "Determines whether or not critical hits will amplify the strength of the launch, according to the enemy's respective damage multiplier.",
 	  ["menu_gensec_space_program_other_players_launch"] = "Other players can launch corpses",
-	  ["menu_gensec_space_program_other_players_launch_desc"] = "Determine whether or not other players in the session will launch bodies according to the other options specified here. Jokers, turrets, and AI Crew mates are not considered."
+	  ["menu_gensec_space_program_other_players_launch_desc"] = "Determine whether or not other players in the session will launch bodies according to the other options specified here. Jokers, turrets, and AI Crew mates are not considered.",
 	  --["menu_gensec_space_program_crit_launch_multiplier_desc"] = "Choose if you want critical hits to amplify the launch further, and if so, by how much."
 	})
   end)
@@ -190,7 +245,7 @@ dofile(ModPath .. "automenubuilder.lua") -- run the auto menu builder file to ha
 Hooks:Add("MenuManagerBuildCustomMenus", "MenuManagerBuildCustomMenusgensec_space_program", function(menu_manager, nodes)
 
 	AutoMenuBuilder:load_settings(gensec_space_program.settings, "gensec_space_program")
-	ref_dmg_IDENTIFIER_OPTION_desc = "test"
+	--ref_dmg_IDENTIFIER_OPTION_desc = "test"
 	AutoMenuBuilder:create_menu_from_table(nodes, gensec_space_program.settings, "gensec_space_program", "blt_options", gensec_space_program.values --[[ optional ]], gensec_space_program.order --[[ optional ]])
   
   end)
@@ -202,7 +257,7 @@ gensec_space_program = gensec_space_program or {
     launch_multiplier = 1, 
 	infinite_launch_range = false,
 	crit_launch_toggle = true, 
-	other_players_launch = true
+	other_players_launch = true,
 	--crit_launch_multiplier = 1
   },
   values = {
