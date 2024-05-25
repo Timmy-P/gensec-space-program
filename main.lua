@@ -14,7 +14,6 @@ cl_dir = nil
 cl_distance = nil
 cl_attacker = nil
 --is_graze_kill = false
-
 --cl_ is usually "client," first prefix I could think of for saving/storing the values of the parameters pass into _do_shotgun_push
 --Reason being is for Graze kills, found it easier to recycle some of values, as Graze is considered after the shotgun push of the original kill
 
