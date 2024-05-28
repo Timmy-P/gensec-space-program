@@ -1,4 +1,6 @@
 --TO DO LIST
+-- Make AI Crewmates damage scale properly
+-- Find cleaner way to get other player's damage output.
 -- Look into body expertise and/or headshot damage | No BE, but clamp to Judge is fine
 -- Look into explosive damage being amplified
 
@@ -79,6 +81,11 @@ end)
 
 
 Hooks:PostHook(CopDamage, 'damage_simple', 'get_graze', function(self, attack_data)
+	if attack_data.result ~= nil then
+		--attack_data.result comes up nil when shooting invuln marshalls. The bandade of all time™
+	else
+		return
+	end
 	if attack_data.variant == "graze" and attack_data.result.type == "death" then
 		--managers.chat:_receive_message(managers.chat.GAME, "damage_simple", "graze for " .. g_dmg, ccolor)
 		--g_dmg = attack_data.damage
