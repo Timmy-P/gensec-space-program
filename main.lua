@@ -79,7 +79,6 @@ Hooks:PostHook(CopDamage, 'sync_damage_bullet', 'get_ded', function(self, attack
 
 end)
 
-
 Hooks:PostHook(CopDamage, 'damage_simple', 'get_graze', function(self, attack_data)
 	if attack_data.result ~= nil then
 		--attack_data.result comes up nil when shooting invuln marshalls. The bandade of all time™
@@ -123,6 +122,93 @@ Hooks:PostHook(CopDamage, 'damage_bullet', 'get_not_graze', function(attack_data
 	cl_dir = attack_data.attack_dir
 end)
 
+Hooks:PostHook(CopDamage, 'damage_explosion', 'get_boomies', function(self, attack_data)
+	if attack_data.result ~= nil then
+		--attack_data.result comes up nil when shooting invuln marshalls. The bandade of all time™
+	else
+		return
+	end
+	if attack_data.result.type == "death" then
+		g_dmg = attack_data.damage
+		--managers.chat:_receive_message(managers.chat.GAME, "damage_explosion", "boom", ccolor)
+		c_dmg = 1
+		dmg_mul = 1
+		other_kill = false
+		--is_graze_kill = true
+		--managers.chat:_receive_message(managers.chat.GAME, "damage_simple", "graze!", ccolor)
+		local hit_pos = mvector3.copy(self._unit:movement():m_pos())
+		--local g_distance = mvector3.normalize(attack_data.attack_dir)
+		cl_dir = attack_data.col_ray.ray
+		if cl_dir ~= nil then 
+			local g_distance = mvector3.normalize(cl_dir)
+			managers.game_play_central:_do_shotgun_push(self._unit, hit_pos, cl_dir, g_distance, cl_attacker)
+		else
+			local g_distance = mvector3.normalize(attack_data.attack_dir)
+			managers.game_play_central:_do_shotgun_push(self._unit, hit_pos, attack_data.attack_dir, g_distance, cl_attacker)
+		end
+	end
+end)
+
+Hooks:PostHook(CopDamage, 'sync_damage_explosion', 'get_other_boomies', function(self, attacker_unit, damage_percent, i_attack_variant, death, direction, weapon_unit)
+	local hit_pos = mvector3.copy(self._unit:movement():m_pos())
+	--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_explosion", "boom", ccolor)
+	--mvector3.set_z(hit_pos, hit_pos.z + hit_offset_height)
+	mvector3.set_z(hit_pos, hit_pos.z)
+	local attack_dir, s_distance = nil
+
+	if attacker_unit then
+		attack_dir = hit_pos - attacker_unit:movement():m_head_pos()
+		s_distance = mvector3.normalize(attack_dir)
+	else
+		attack_dir = self._unit:rotation():y()
+	end
+	
+	if death and gensec_space_program.settings.other_players_launch == true then
+		other_kill = true
+		--is_graze_kill = false
+		g_dmg = damage_percent * self._HEALTH_INIT_PRECENT
+		g_dmg = g_dmg * 5
+		c_dmg = 1
+		dmg_mul = 1
+		ref_dmg = (gensec_space_program.settings.reference_damage / 10) * (damage_percent * self._HEALTH_INIT_PRECENT)
+		managers.game_play_central:_do_shotgun_push(self._unit, hit_pos, attack_dir, s_distance)
+		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "ded for " .. g_dmg .. " ref ".. ref_dmg .. " d_% " .. damage_percent .. " ship " .. self._HEALTH_INIT_PRECENT, ccolor)
+		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "ref is " .. ref_dmg, ccolor)
+		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "d_% is " .. damage_percent .. "", ccolor)
+		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "ship = " .. self._HEALTH_INIT_PRECENT, ccolor)
+	end
+end)
+
+--[[Hooks:PostHook(CopDamage, 'damage_melee', 'get_bonked', function(self,attack_data)
+	--managers.chat:_receive_message(managers.chat.GAME, "damage_melee", "bonk", ccolor)
+	if attack_data.result.type == "death" then
+		managers.chat:_receive_message(managers.chat.GAME, "damage_melee", "bonk", ccolor)
+		g_dmg = attack_data.damage
+		c_dmg = 1
+		dmg_mul = 1
+		other_kill = false
+		--is_graze_kill = true
+		--managers.chat:_receive_message(managers.chat.GAME, "damage_simple", "graze!", ccolor)
+		local hit_pos = mvector3.copy(self._unit:movement():m_pos())
+		--local g_distance = mvector3.normalize(attack_data.attack_dir)
+		--cl_dir = attack_data.col_ray.body
+		if cl_dir ~= nil then 
+			local g_distance = mvector3.normalize(cl_dir)
+			managers.game_play_central:_do_shotgun_push(self._unit, hit_pos, cl_dir, g_distance, cl_attacker)
+		else
+			local g_distance = mvector3.normalize(attack_data.col_ray.body)
+			managers.game_play_central:_do_shotgun_push(self._unit, hit_pos, attack_data.attack_dir, g_distance, cl_attacker)
+		end
+	end
+end)]]--
+
+--[[Hooks:PostHook(RaycastWeaponBase, 'melee_damage_info', 'get_melee_stuff', function(self,...)
+	local my_tweak_data = self:weapon_tweak_data()
+	local dmg = my_tweak_data.damage_melee * self:melee_damage_multiplier()
+	local dmg_effect = dmg * my_tweak_data.damage_melee_effect_mul
+	managers.chat:_receive_message(managers.chat.GAME, "melee_damage_info", "Bonking for " .. dmg_effect .." dmg_mul is ".. dmg_mul, ccolor)
+end)]]--
+
 Hooks:PreHook(RaycastWeaponBase, '_get_current_damage', 'get_real_damage' , function(self, dmg_mul)
 	g_dmg = self._damage * dmg_mul
 	other_kill = false
@@ -138,6 +224,8 @@ Hooks:PostHook(GamePlayCentralManager, 'get_shotgun_push_range', 'max_range', fu
 		return 999999999999999
 	end
 end)
+
+
 
 if RequiredScript == "lib/managers/gameplaycentralmanager" then
 	function GamePlayCentralManager:_do_shotgun_push(unit, hit_pos, dir, distance, attacker)
@@ -163,7 +251,7 @@ if RequiredScript == "lib/managers/gameplaycentralmanager" then
 			if other_kill == false then
 				ref_dmg = gensec_space_program.settings.reference_damage / 10
 			end
-			--Multiplies by crits. Will be 1 if it didn't crit.
+			--Multiplies by crits. c_dmg will be 1 if it didn't crit.
 			scale = scale * c_dmg
 			scale = scale * math.max(1, (g_dmg / ref_dmg))
 			scale = scale * gensec_space_program.settings.launch_multiplier
@@ -176,7 +264,7 @@ if RequiredScript == "lib/managers/gameplaycentralmanager" then
 		local rot_time = 1 + math.rand(2)
 		local asm = unit:anim_state_machine()
 		
-		--This is vanilla code will nerf the effect on dozers and - to my knowledge - bosses like Yufu Wang and Gabriel.
+		--This is vanilla code will nerf the effect on dozers and - to my knowledge - bosses like Yufu Wang, Gabriel, Sanchez, etc.
 		--Might make an option to disable this, or if you're reading this and want to buff
 		--dozer pushes for some reason, the entire if statement is safe to delete or comment out.
 		--Might make this a toggle later.
