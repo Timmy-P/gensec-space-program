@@ -50,11 +50,26 @@ Hooks:PostHook(CopDamage, 'roll_critical_hit', 'get_crit', function(self, attack
 	--managers.chat:_receive_message(managers.chat.GAME, "roll_critical_hit", "Crit for " .. c_dmg, ccolor)
 end)
 
+Hooks:PostHook(CopDamage, 'damage_bullet', 'get_not_graze', function(attack_data)
+	--managers.chat:_receive_message(managers.chat.GAME, "damage_bullet", "boolet", ccolor)
+	local gname = "amcar"
+	--is_graze_kill = false
+	other_kill = false
+	cl_dir = attack_data.attack_dir
+	
+	
+end)
+
 Hooks:PostHook(CopDamage, 'sync_damage_bullet', 'get_ded', function(self, attacker_unit, damage_percent, i_body, hit_offset_height, variant, death)
 	local hit_pos = mvector3.copy(self._unit:movement():m_pos())
 	mvector3.set_z(hit_pos, hit_pos.z + hit_offset_height)
 	local attack_dir, s_distance = nil
-
+	local attack_data = {}
+	attack_data.pos = hit_pos
+	attack_data.attacker_unit = attacker_unit
+	attack_data.variant = "bullet"
+	attack_data.headshot = head
+	attack_data.weapon_unit = attacker_unit and attacker_unit:inventory() and attacker_unit:inventory():equipped_unit()
 	if attacker_unit then
 		attack_dir = hit_pos - attacker_unit:movement():m_head_pos()
 		s_distance = mvector3.normalize(attack_dir)
@@ -75,6 +90,14 @@ Hooks:PostHook(CopDamage, 'sync_damage_bullet', 'get_ded', function(self, attack
 		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "ref is " .. ref_dmg, ccolor)
 		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "d_% is " .. damage_percent .. "", ccolor)
 		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "ship = " .. self._HEALTH_INIT_PRECENT, ccolor)
+		--local gname = "amcar"
+		--local gname = tostring(attacker_unit:inventory():equipped_unit():base():get_name_id())
+		--gname = string.sub(gname, 0 , (gname:len()-5))
+		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "Weap ID: " .. "gname: " .. gname, ccolor) --:base():weapon_tweak_data().armor_piercing_chance
+		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "Weapon ID: " .. tostring(tweak_data.weapon[gname].stats.damage), ccolor)
+		--local g_name = attacker_unit:inventory():equipped_unit():base():get_name_id()
+		--gname = string.strsub(gname, 0, (g_name:len())-5)
+		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "Weap ID: " .. gname, ccolor) --:base():weapon_tweak_data().armor_piercing_chance
 	end
 
 end)
@@ -113,13 +136,6 @@ Hooks:PostHook(CopDamage, 'damage_simple', 'get_graze', function(self, attack_da
 			--is_graze_kill = true
 		--end
 	end
-end)
-
-Hooks:PostHook(CopDamage, 'damage_bullet', 'get_not_graze', function(attack_data)
-	--managers.chat:_receive_message(managers.chat.GAME, "damage_bullet", "boolet", ccolor)
-	--is_graze_kill = false
-	other_kill = false
-	cl_dir = attack_data.attack_dir
 end)
 
 Hooks:PostHook(CopDamage, 'damage_explosion', 'get_boomies', function(self, attack_data)
@@ -161,13 +177,27 @@ Hooks:PostHook(CopDamage, 'sync_damage_explosion', 'get_other_boomies', function
 		s_distance = mvector3.normalize(attack_dir)
 	else
 		attack_dir = self._unit:rotation():y()
+		s_distance = 1000 --arbitrary value to prevent it from not being set, then crashing in the shotgun_push function for being nil
 	end
 	
 	if death and gensec_space_program.settings.other_players_launch == true then
 		other_kill = true
 		--is_graze_kill = false
+		
 		g_dmg = damage_percent * self._HEALTH_INIT_PRECENT
-		g_dmg = g_dmg * 5
+		--[[local gname = tostring(attacker_unit:inventory():equipped_unit():base():get_name_id())
+		gname = string.sub(gname, 0 , (gname:len()-5))
+		g_dmg = g_dmg * tweak_data.weapon[gname].stats.damage--]]
+		--g_dmg = g_dmg * 5
+		local attack_data = {
+			variant = variant,
+			attacker_unit = attacker_unit,
+			weapon_unit = weapon_unit or attacker_unit and attacker_unit:inventory() and attacker_unit:inventory():equipped_unit()
+		}
+		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_explosion", "damage: " .. tostring(attacker_unit:inventory():equipped_unit():base():weapon_tweak_data().use_data.selection_index), ccolor) --:base():weapon_tweak_data().armor_piercing_chance
+		--g_dmg = g_dmg * attacker_unit:inventory():equipped_unit():base():weapon_tweak_data().DAMAGE
+		
+		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_explosion", "ID:  " .. tostring(attacker_unit:inventory():equipped_unit():base():get_name_id()), ccolor)
 		c_dmg = 1
 		dmg_mul = 1
 		ref_dmg = (gensec_space_program.settings.reference_damage / 10) * (damage_percent * self._HEALTH_INIT_PRECENT)
@@ -224,8 +254,6 @@ Hooks:PostHook(GamePlayCentralManager, 'get_shotgun_push_range', 'max_range', fu
 		return 999999999999999
 	end
 end)
-
-
 
 if RequiredScript == "lib/managers/gameplaycentralmanager" then
 	function GamePlayCentralManager:_do_shotgun_push(unit, hit_pos, dir, distance, attacker)
