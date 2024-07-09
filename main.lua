@@ -3,6 +3,7 @@
 -- Find cleaner way to get other player's damage output.
 -- Look into body expertise and/or headshot damage | No BE, but clamp to Judge is fine
 -- Look into explosive damage being amplified
+-- Add melee damage
 
 ccolor = Color(255, 0, 170, 255) / 255 --defining a color for debug chat messages
 tmp_vec1 = Vector3()
@@ -52,7 +53,7 @@ end)
 
 Hooks:PostHook(CopDamage, 'damage_bullet', 'get_not_graze', function(attack_data)
 	--managers.chat:_receive_message(managers.chat.GAME, "damage_bullet", "boolet", ccolor)
-	local gname = "amcar"
+	--local gname = "amcar"
 	--is_graze_kill = false
 	other_kill = false
 	cl_dir = attack_data.attack_dir
@@ -75,6 +76,7 @@ Hooks:PostHook(CopDamage, 'sync_damage_bullet', 'get_ded', function(self, attack
 		s_distance = mvector3.normalize(attack_dir)
 	else
 		attack_dir = self._unit:rotation():y()
+		s_distance = 1000
 	end
 	
 	if death and gensec_space_program.settings.other_players_launch == true then
@@ -171,7 +173,7 @@ Hooks:PostHook(CopDamage, 'sync_damage_explosion', 'get_other_boomies', function
 	--mvector3.set_z(hit_pos, hit_pos.z + hit_offset_height)
 	mvector3.set_z(hit_pos, hit_pos.z)
 	local attack_dir, s_distance = nil
-	if attacker_unit then
+	if attack_dir then
 		attack_dir = hit_pos - attacker_unit:movement():m_head_pos()
 		s_distance = mvector3.normalize(attack_dir)
 		--grabbing weapon damage
@@ -185,9 +187,22 @@ Hooks:PostHook(CopDamage, 'sync_damage_explosion', 'get_other_boomies', function
 	if death and gensec_space_program.settings.other_players_launch == true then
 		other_kill = false --supposed to be true, but since we can get the actual damage it's not needed
 		--is_graze_kill = false
-		g_dmg = 48
-		if attacker_unit:inventory():equipped_unit():base():weapon_tweak_data().stats then
-			g_dmg = attacker_unit:inventory():equipped_unit():base():weapon_tweak_data().stats.damage
+		--g_dmg = 48
+		--[[if attacker_unit ~= nil then
+			if attacker_unit:inventory():equipped_unit():base():weapon_tweak_data().stats ~= nil then 
+				g_dmg = attacker_unit:inventory():equipped_unit():base():weapon_tweak_data().stats.damage or 48
+			end
+		end--]]
+		if attacker_unit and attacker_unit:inventory() and attacker_unit:inventory():equipped_unit() then --NX
+			if attacker_unit:inventory():equipped_unit():base():weapon_tweak_data().stats ~= nil then 
+				g_dmg = attacker_unit:inventory():equipped_unit():base():weapon_tweak_data().stats.damage or 48
+			else
+				--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_explosion", "(0)nil value, any crashers?", ccolor)
+				g_dmg = 48
+			end
+		else
+			--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_explosion", "(1)nil value, any crashers?", ccolor)
+			g_dmg = 48
 		end
 		--[[local gname = tostring(attacker_unit:inventory():equipped_unit():base():get_name_id())
 		gname = string.sub(gname, 0 , (gname:len()-5))
@@ -201,20 +216,10 @@ Hooks:PostHook(CopDamage, 'sync_damage_explosion', 'get_other_boomies', function
 		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_explosion", "damage: " .. tostring(attacker_unit:inventory():equipped_unit():base():weapon_tweak_data().use_data.selection_index), ccolor) --:base():weapon_tweak_data().armor_piercing_chance
 		--g_dmg = g_dmg * attacker_unit:inventory():equipped_unit():base():weapon_tweak_data().DAMAGE
 		--g_dmg = damage_percent * self._HEALTH_INIT_PRECENT
-		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_explosion", "ID:  " .. tostring(attacker_unit:inventory():equipped_unit():base():weapon_tweak_data().stats.damage), ccolor)
-		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_explosion", "g_dmg: " .. g_dmg, ccolor)
 		--c_dmg = 1
-		--grabbing weapon damage, or 48 - Arbiter - if nil.
-		--g_dmg = attacker_unit:inventory():equipped_unit():base():weapon_tweak_data().stats.damage or 48
 		dmg_mul = 1
 		ref_dmg = (gensec_space_program.settings.reference_damage / 10)
 		managers.game_play_central:_do_shotgun_push(self._unit, hit_pos, direction or attack_dir, s_distance)
-		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "direction: " .. tostring(direction) .. " s_distance: " .. tostring(s_distance) .. " attack_dir: " .. tostring(attack_dir), ccolor)
-		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "s_distance: " .. tostring(s_distance), ccolor)
-
-		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "ref is " .. ref_dmg, ccolor)
-		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "d_% is " .. damage_percent .. "", ccolor)
-		--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_bullet", "ship = " .. self._HEALTH_INIT_PRECENT, ccolor)
 	end
 end)
 
