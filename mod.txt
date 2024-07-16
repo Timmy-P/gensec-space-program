@@ -3,7 +3,7 @@
     "description" : "Every gun has the shotgun catapult effect",
     "author" : "Timmy-P",
     "contact" : "Discord: @timmyp7",
-    "version" : "1.9",
+    "version" : "2.0",
 	"blt_version" : 2,
     "hooks" : [
 		{
@@ -33,7 +33,8 @@
 			"identifier" : "timmy_all_shotty",
 			"host": {
 				"meta": "https://github.com/Timmy-P/gensec-space-program/raw/main/meta.json",
-				"download": "https://github.com/Timmy-P/gensec-space-program/archive/refs/heads/main.zip"
+				"download": "https://github.com/Timmy-P/gensec-space-program/archive/refs/heads/main.zip",
+				"patchnotes": "https://modworkshop.net/mod/47824?tab=changelog"
 			}
 		}
 	]

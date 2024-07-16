@@ -109,7 +109,7 @@ if RequiredScript == "lib/units/enemies/cop/copdamage" then
 		else
 			return
 		end
-		if attack_data.result.type == "death" then
+		if attack_data.result.type == "death" and not managers.groupai:state():whisper_mode() then
 			g_dmg = attack_data.damage
 			--c_dmg = 1
 			dmg_mul = 1
@@ -173,7 +173,7 @@ if RequiredScript == "lib/units/enemies/cop/copdamage" then
 	end)
 
 	Hooks:PostHook(CopDamage, 'damage_melee', 'get_bonked', function(self,attack_data)
-		if attack_data.result then
+		if attack_data.result and not managers.groupai:state():whisper_mode() then
 			if attack_data.result.type == "death" then
 				local damage = managers.blackmarket:equipped_melee_weapon_damage_info(m_lerp)
 				damage = damage * managers.player:get_melee_dmg_multiplier()
