@@ -1,9 +1,11 @@
 --TO DO LIST
 -- Make AI Crewmates/jokers/sentries damage scale properly
--- Look into body expertise and/or headshot damage | No BE, but clamp to Judge is fine
--- Work in HVT(?)
--- Restructure to prevent multi-hooking
--- Melee cloakers katana as Jiro is weird interaction
+-- Scaling Crits
+--[[* Fixed launching cops in stealth when you shouldn't be able to. Again.
+* Fixed potential crash with other players launching corpses (sync_damage_bullet)
+* Added sliding scale for launches (no longer 5m or infinite, can select between 0 and 250 meters. Infinite is still available though!)
+* AI Crew mates weapons now scale properly. Jokers and Turrets are still wonky.
+]]--
 
 ccolor = Color(255, 0, 170, 255) / 255 --defining a color for debug chat messages
 tmp_vec1 = Vector3()
@@ -20,14 +22,21 @@ cl_attacker = nil
 --cl_ is usually "client," first prefix I could think of for saving/storing the values of the parameters pass into _do_shotgun_push
 --Reason being is for Graze kills, found it easier to recycle some of values, as Graze is considered after the shotgun push of the original kill
 
+function debug_chat(name,message)
+	managers.chat:_receive_message(managers.chat.GAME, name, message, ccolor)
+end
+--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_melee", Utils.ToString(attack_dir), ccolor)
+
 g_dmg = 16.28 --predeclaring to hopefully avoid nil crashes
 --g_dmg_mul = 1 --to extract damage boosts like Zerk, OVK, etc.
 c_dmg = 1 --same as above
 other_kill = false
 other_melee = false --no comment
+ai_kill = false
 --ref_dmg = 16.28 --Base damage of the Judge shotgun, which is our par damage
 --Yes, everything's divided by 10 I don't know either
 m_lerp = 0 --for the value 'charge_lerp_value' in playerstandard.lua, in order to properly gauge melee damage
+
 
 if RequiredScript == "lib/units/enemies/cop/copdamage" then 
 	Hooks:PostHook(CopDamage, 'roll_critical_hit', 'get_crit', function(self, attack_data, damage)
@@ -38,14 +47,29 @@ if RequiredScript == "lib/units/enemies/cop/copdamage" then
 		if tvar == true and gensec_space_program.settings.crit_launch_toggle == true then
 			local dum_crit = self._char_tweak.critical_hits or {}
 			c_dmg = dum_crit.damage_mul or self._char_tweak.headshot_dmg_mul
+			--debug_chat("roll_critical_hit", "crit for ".. c_dmg)
 		else
+			--debug_chat("roll_critical_hit", "non-crit for ".. c_dmg)
 			c_dmg = 1 --If it didn't crit, set it back to 1. Simpler to just set this to 1 and always multiply the "scale" value
 			--by this var every time than to run a check down there.
 		end
 	end)
 
 	Hooks:PostHook(CopDamage, 'damage_bullet', 'get_not_graze', function(self, attack_data)
-		other_kill = false
+		if attack_data.result ~= nil then 
+			if attack_data.result.type == "death" then
+				other_kill = false
+
+				--From TeamAIDamage, hoping to get a more accurate damage value from bots.
+				--debug_chat("copdamage_damage_bullet", Utils.ToString(attack_data))
+				if ai_kill == true and attack_data.raw_damage ~= nil then
+					ai_kill = false
+					--debug_chat("cd_dmg_bullet", Utils.ToString(attack_data.raw_damage))
+					g_dmg = attack_data.raw_damage
+					c_dmg = 1
+				end
+			end
+		end
 		cl_dir = attack_data.attack_dir
 	end)
 
@@ -57,8 +81,9 @@ if RequiredScript == "lib/units/enemies/cop/copdamage" then
 		attack_data.pos = hit_pos
 		attack_data.attacker_unit = attacker_unit
 		attack_data.variant = "bullet"
-		attack_data.headshot = head
+		--attack_data.headshot = head
 		attack_data.weapon_unit = attacker_unit and attacker_unit:inventory() and attacker_unit:inventory():equipped_unit()
+		--debug_chat("sync_damage_bullet", Utils.ToString(attacker_unit:inventory():equipped_unit():base()._non_npc_name_id))
 		if attacker_unit then
 			attack_dir = hit_pos - attacker_unit:movement():m_head_pos()
 			s_distance = mvector3.normalize(attack_dir)
@@ -67,10 +92,36 @@ if RequiredScript == "lib/units/enemies/cop/copdamage" then
 			s_distance = 1000
 		end
 		
-		if death and gensec_space_program.settings.other_players_launch == true then
-			other_kill = true
-			--is_graze_kill = false
-			g_dmg = damage_percent * self._HEALTH_INIT_PRECENT
+		if death and gensec_space_program.settings.other_players_launch == true and not managers.groupai:state():whisper_mode() then
+			
+			--Predeclaring to save on some else statements down below. Don't ask...
+			g_dmg = 4.8
+			--Attempt to get other player weapon damage. If not, then default to what's been done before this implementation.
+			--It's technically considered an NPC thing, but non_npc_name_id exists, so turn that into a string and get the
+			--tweak_data. Surprisingly, this just works™ after testing with things that I thought don't even have an NPC variant
+			--(e.g., Minigun, Akimbos, etc.), but of course redundancy is in place.
+			
+			--Gods forgive me for whatever this is below
+			if attacker_unit:inventory() then
+				if attacker_unit:inventory():equipped_unit() then
+					if attacker_unit:inventory():equipped_unit():base() then
+						if attacker_unit:inventory():equipped_unit():base()._non_npc_name_id ~= nil then
+							other_kill = false
+							if attacker_unit:inventory():equipped_unit():base()._non_npc_name_id  ~= nil then
+								local gname = attacker_unit:inventory():equipped_unit():base()._non_npc_name_id
+								if tweak_data.weapon[gname] then 
+									if tweak_data.weapon[gname].stats ~= nil then
+										if tweak_data.weapon[gname].stats.damage ~= nil then
+											g_dmg = tweak_data.weapon[gname].stats.damage
+										end
+									end
+								end
+							end
+							--debug_chat("sync_damage_bullet", Utils.ToString(tweak_data.weapon[gname].stats.damage))
+						end
+					end
+				end
+			end
 			--g_dmg = g_dmg * 5
 			c_dmg = 1
 			dmg_mul = 1
@@ -143,7 +194,7 @@ if RequiredScript == "lib/units/enemies/cop/copdamage" then
 			--managers.chat:_receive_message(managers.chat.GAME, "sync_damage_explosion", "direction not found", ccolor)
 		end
 		
-		if death and gensec_space_program.settings.other_players_launch == true then
+		if death and gensec_space_program.settings.other_players_launch == true and not managers.groupai:state():whisper_mode() then
 			other_kill = false --supposed to be true, but since we can get the actual damage it's not needed
 
 			--Attempt to get the base damage of the weapon used, if nil then default to the weakest explosive launcher, the Arbiter, for 480, or 48 internally.
@@ -203,7 +254,7 @@ if RequiredScript == "lib/units/enemies/cop/copdamage" then
 				s_distance = 100 --arbitrary value to prevent it from not being set, then crashing in the shotgun_push function for being nil
 			end
 			
-			if death and gensec_space_program.settings.other_players_launch == true then
+			if death and gensec_space_program.settings.other_players_launch == true and not managers.groupai:state():whisper_mode() then
 				other_kill = false --supposed to be true, but since we can get the actual damage it's not needed
 				--is_graze_kill = false
 				if attacker_unit and attacker_unit:inventory() and attacker_unit:inventory():get_melee_weapon_id() then --NX
@@ -242,6 +293,8 @@ end
 
 Hooks:PostHook(RaycastWeaponBase, '_get_current_damage', 'get_real_damage' , function(self, dmg_mul)
 	g_dmg = self._damage * dmg_mul
+	--debug_chat("_get_current_damage", "damage calculated")
+	--ai_kill = false
 	--g_dmg = self._damage
 	--g_dmg_mul = dmg_mul
 	other_kill = false
@@ -256,7 +309,8 @@ Hooks:PostHook(RaycastWeaponBase, 'should_shotgun_push', 'everyonepushes' , func
 			return true
 		end
 			--In stealth, all guns behave as expected.
-			return _do_shotgun_push
+			--Edit: Apparently, this part isn't even needed, keeping this commented in case something I couldn't think of at 2:30 in the morning pops up
+			--return self._do_shotgun_push
 end)
 
 Hooks:PreHook(PlayerStandard, '_do_melee_damage', 'get_real_melee_stuff', function(self, t, bayonet_melee, melee_hit_ray, melee_entry, hand_id)
@@ -269,12 +323,30 @@ Hooks:PreHook(PlayerStandard, '_do_melee_damage', 'get_real_melee_stuff', functi
 	--managers.chat:_receive_message(managers.chat.GAME, "_do_melee_damage", "b o n k for: " .. m_lerp, ccolor)
 end)
 
+Hooks:PreHook(TeamAIDamage, 'damage_bullet', 'get_ai_dmg', function(self, attack_data)
+	--debug_chat("teamaidamage_damage_bullet", Utils.ToString(attack_data))
+	ai_kill = true --Dumb flag, hopefully to prevent borrowing from player's last used weapon
+	--debug_chat("teamai", "blep")
+end)
+
+Hooks:PreHook(HuskTeamAIDamage, 'damage_bullet', 'get_host_ai_dmg', function(self, attack_data)
+	ai_kill = true --Dumb flag, hopefully to prevent borrowing from player's last used weapon
+	--debug_chat("huskteamai", "blep")
+end)
+
 if RequiredScript == "lib/managers/gameplaycentralmanager" then
 	Hooks:PostHook(GamePlayCentralManager, 'get_shotgun_push_range', 'max_range', function(attacker)
 		--Make the push universal.
 		--Currently a toggle between 5 meters and 9 quadrillion meters, but maybe making a slider would be nice.
-		if not managers.groupai:state():whisper_mode() and gensec_space_program.settings.infinite_launch_range == true then
+		--[[if not managers.groupai:state():whisper_mode() and gensec_space_program.settings.launch_range.infinite_launch_range == true then
 			return 999999999999999
+		end--]]
+		if not managers.groupai:state():whisper_mode() then
+			if gensec_space_program.settings.launch_range.infinite_launch_range then
+				return 999999999999999
+			else
+				return (gensec_space_program.settings.launch_range.max_dist * 100)
+			end	
 		end
 	end)
 	
@@ -298,9 +370,9 @@ if RequiredScript == "lib/managers/gameplaycentralmanager" then
 		--Magic happens here. If your gun's damage is higher than the Judge, calculate the ratio and multiply the vector's scalar by it.
 		--If not, then it's a Judge (or whatever damage the user specified).
 		if not managers.groupai:state():whisper_mode() then
-			if other_kill == false then
-				ref_dmg = gensec_space_program.settings.reference_damage / 10
-			end
+			--if other_kill == false then
+			ref_dmg = gensec_space_program.settings.reference_damage / 10
+			--end
 			if other_melee == true then
 				--This is the only way I could think of to get sync_melee kills to not turn cops into spaghetti
 				scale = scale / 100
@@ -337,8 +409,11 @@ if RequiredScript == "lib/managers/gameplaycentralmanager" then
 		--What I did was band-aid solutions to make things scale with gun damage, however
 		--You can also just buff everything with this if you want.
 		--Update: Why would you do that you have the multiplier setting in-game I-
+		if gensec_space_program.settings.force_pull == true then
+			scale = scale * -1
+		end
 		mvector3.multiply(push_vec, 600 * scale)
-	
+		
 		local unit_pos = tmp_vec2
 	
 		unit:m_position(unit_pos)
@@ -379,7 +454,7 @@ Hooks:Add("LocalizationManagerPostInit", "GSP_menu_loc", function(localization_m
 
 	localization_manager:add_localized_strings({
 	  ["menu_gensec_space_program_buff_dozer_launches_desc"] = "Choose whether or not to disable the vanilla behavior of dozers/bosses getting reduced launch power (70% reduction).",
-	  ["menu_gensec_space_program_reference_damage_desc"] = "Chooses the 'pivot point' of the launch multiplier. Higher will mean stronger launches on average, and vice versa. (Default is 162.80, or a stock Judge).",
+	  ["menu_gensec_space_program_reference_damage_desc"] = "Chooses the 'pivot point' of the launch multiplier. Lower will mean stronger launches on average, and vice versa. (Default is 162.80, or a stock Judge).",
 	  ["menu_gensec_space_program_launch_multiplier_desc"] = "A multiplier of the launch overall.",
 	  ["menu_gensec_space_program_infinite_launch_range_desc"] = "Whether or not you want to launch cops with kills further than 5 meters away from you.",
 	  ["menu_gensec_space_program_crit_launch_toggle"] = "Crits amplify launch strength",
@@ -387,8 +462,12 @@ Hooks:Add("LocalizationManagerPostInit", "GSP_menu_loc", function(localization_m
 	  ["menu_gensec_space_program_other_players_launch"] = "Other players can launch corpses",
 	  ["menu_gensec_space_program_other_players_launch_desc"] = "Determine whether or not other players in the session will launch bodies according to the other options specified here. Jokers, turrets, and AI Crew mates are not considered.",
 	  ["menu_gensec_space_program_max_melee_toggle"] = "Use Max Melee Damage for Other Players",
-	  ["menu_gensec_space_program_max_melee_toggle_desc"] = "When calculating launch strength for *other players* melee kills, use the maximum damage of their respective melee weapon as oppossed to their minimum."
-	  --["menu_gensec_space_program_crit_launch_multiplier_desc"] = "Choose if you want critical hits to amplify the launch further, and if so, by how much."
+	  ["menu_gensec_space_program_max_melee_toggle_desc"] = "When calculating launch strength for *other players* melee kills, use the maximum damage of their respective melee weapon as oppossed to their minimum.",
+	  ["menu_gensec_space_program_crit_launch_multiplier"] = "Critical Hit Launch Multiplier",
+	  ["menu_gensec_space_program_crit_launch_multiplier_desc"] = "Determine if you want the rate in which critical hits multiply launch strength to be lessened. Because let's face it, crit multipliers can get a bit absurd sometimes.",
+	  ["menu_gensec_space_program_max_dist"] = "Maximum launch range",
+	  ["menu_gensec_space_program_max_dist_desc"] = "Manually set the maximum distance from the target in which the mod will apply. Not effected if infinite range is enabled. (Default is 5.00, or 5 meters)",
+	  ["menu_gensec_space_program_force_pull_desc"] = "Set cops to fly towards you instead of you."
 	})
   end)
   if not AutoMenuBuilder then
@@ -407,15 +486,21 @@ gensec_space_program = gensec_space_program or {
     buff_dozer_launches = false, 
     reference_damage = 162.80, 
     launch_multiplier = 1, 
-	infinite_launch_range = false,
+	--infinite_launch_range = false,
 	crit_launch_toggle = true, 
 	other_players_launch = true,
 	max_melee_toggle = false,
-	--crit_launch_multiplier = 1
+	--crit_launch_multiplier = 1,
+	launch_range = {
+		infinite_launch_range = false,
+		max_dist = 5
+	},
+	force_pull = false
   },
   values = {
     reference_damage = { 10, 10000, 0.01 }, -- number values make a slider with min, max and step value
 	launch_multiplier = { 0.1, 5, 0.1 },
-    --crit_launch_multiplier = { 0, 1, 0.01 }
+    crit_launch_multiplier = { 0, 1, 0.01 },
+	max_dist = { 0, 250, 0.1 }
   },
 }
