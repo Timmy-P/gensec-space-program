@@ -384,6 +384,9 @@ if RequiredScript == "lib/managers/gameplaycentralmanager" then
 			--Multiplies by crits. c_dmg will be 1 if it didn't crit.
 			scale = scale * c_dmg
 			scale = scale * gensec_space_program.settings.launch_multiplier
+			if gensec_space_program.settings.force_pull == true then
+				scale = scale * -1
+			end
 		end
 		--managers.chat:_receive_message(managers.chat.GAME, "_do_shotgun_push", "result: " .. (g_dmg / ref_dmg), ccolor)
 		c_dmg = 1
@@ -397,7 +400,7 @@ if RequiredScript == "lib/managers/gameplaycentralmanager" then
 		--dozer pushes for some reason, the entire if statement is safe to delete or comment out.
 		--Might make this a toggle later.
 		--Update: I made this a toggle later.
-		if gensec_space_program.settings.buff_dozer_launches == false and not managers.groupai:state():whisper_mode() then
+		if gensec_space_program.settings.buff_dozer_launches == false then
 			if asm and asm:get_global("tank") == 1 then
 				scale = scale * 0.3
 				rot_time = rot_time * 0.2
@@ -409,9 +412,7 @@ if RequiredScript == "lib/managers/gameplaycentralmanager" then
 		--What I did was band-aid solutions to make things scale with gun damage, however
 		--You can also just buff everything with this if you want.
 		--Update: Why would you do that you have the multiplier setting in-game I-
-		if gensec_space_program.settings.force_pull == true then
-			scale = scale * -1
-		end
+		
 		mvector3.multiply(push_vec, 600 * scale)
 		
 		local unit_pos = tmp_vec2
