@@ -59,7 +59,6 @@ if RequiredScript == "lib/units/enemies/cop/copdamage" then
 		if attack_data.result ~= nil then 
 			if attack_data.result.type == "death" then
 				other_kill = false
-
 				--From TeamAIDamage, hoping to get a more accurate damage value from bots.
 				--debug_chat("copdamage_damage_bullet", Utils.ToString(attack_data))
 				if ai_kill == true and attack_data.raw_damage ~= nil then
@@ -102,25 +101,32 @@ if RequiredScript == "lib/units/enemies/cop/copdamage" then
 			--(e.g., Minigun, Akimbos, etc.), but of course redundancy is in place.
 			
 			--Gods forgive me for whatever this is below
-			if attacker_unit:inventory() then
-				if attacker_unit:inventory():equipped_unit() then
-					if attacker_unit:inventory():equipped_unit():base() then
-						if attacker_unit:inventory():equipped_unit():base()._non_npc_name_id ~= nil then
-							other_kill = false
-							if attacker_unit:inventory():equipped_unit():base()._non_npc_name_id  ~= nil then
-								local gname = attacker_unit:inventory():equipped_unit():base()._non_npc_name_id
-								if tweak_data.weapon[gname] then 
-									if tweak_data.weapon[gname].stats ~= nil then
-										if tweak_data.weapon[gname].stats.damage ~= nil then
-											g_dmg = tweak_data.weapon[gname].stats.damage
-										end
+			if attacker_unit ~= nil then 
+				if attacker_unit:inventory() ~= nil then
+					--debug_chat(attacker_unit:inventory())
+					if attacker_unit:inventory():equipped_unit() then
+						if attacker_unit:inventory():equipped_unit():base() then
+							if attacker_unit:inventory():equipped_unit():base()._non_npc_name_id ~= nil then
+								other_kill = false
+								--if attacker_unit:inventory():equipped_unit():base()._non_npc_name_id  ~= nil then
+									local gname = attacker_unit:inventory():equipped_unit():base()._non_npc_name_id
+									if tweak_data.weapon[gname] and tweak_data.weapon[gname].stats and tweak_data.weapon[gname].stats.damage then
+										g_dmg = tweak_data.weapon[gname].stats.damage
+									--[[if tweak_data.weapon[gname] then 
+										if tweak_data.weapon[gname].stats ~= nil then
+											if tweak_data.weapon[gname].stats.damage ~= nil then
+												g_dmg = tweak_data.weapon[gname].stats.damage
+											end
+										end--]]
 									end
-								end
+								--end
+								--debug_chat("sync_damage_bullet", Utils.ToString(tweak_data.weapon[gname].stats.damage))
 							end
-							--debug_chat("sync_damage_bullet", Utils.ToString(tweak_data.weapon[gname].stats.damage))
 						end
 					end
 				end
+			else
+				g_dmg = 16.28
 			end
 			--g_dmg = g_dmg * 5
 			c_dmg = 1
